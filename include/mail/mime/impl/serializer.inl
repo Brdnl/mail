@@ -18,7 +18,7 @@ namespace mail::mime {
 	template <typename Body, typename Fields>
 	serializer<Body, Fields>::serializer(value_type& e)
 		: e_(e)
-		, wr_(e, e.body())
+		, wr_(e.base(), e.body())
 	{
 	}
 	template <typename Body, typename Fields>

@@ -30,7 +30,7 @@ namespace mail::smtp {
 					[[fallthrough]];
 				case state::first_code:
 				case state::repeat_code: {
-					if (buffer_size(buffers) < 3) {
+					if (end - iter < 3) {
 						ec = error::need_more;
 						return bytes_transferred;
 					}

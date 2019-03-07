@@ -2,6 +2,7 @@
 
 #include "response.hpp"
 #include "response_parser.hpp"
+#include "read_response.hpp"
 #include "../mime/entity.hpp"
 #include "../mime/serializer.hpp"
 #include <boost/beast/core/type_traits.hpp>
@@ -65,6 +66,27 @@ namespace mail::smtp {
 			OpenHandler, void(boost::beast::error_code)
 		) async_open(boost::beast::string_view domain, OpenHandler&& handler);
 
+		// <<220
+		// >>EHLO
+		// <<250
+		// >>STARTTLS
+		// <<220
+		// (SSL handshake)
+		// >>(SSL)EHLO
+		// <<(SSL)250
+		void open_starttls();
+		void open_starttls(boost::beast::error_code& ec);
+		void open_starttls(boost::beast::string_view domain);
+		void open_starttls(boost::beast::string_view domain, boost::beast::error_code& ec);
+		template <class OpenHandler>
+		BOOST_ASIO_INITFN_RESULT_TYPE(
+			OpenHandler, void(boost::beast::error_code)
+		) async_open_starttls(OpenHandler&& handler);
+		template <class OpenHandler>
+		BOOST_ASIO_INITFN_RESULT_TYPE(
+			OpenHandler, void(boost::beast::error_code)
+		) async_open_starttls(boost::beast::string_view domain, OpenHandler&& handler);
+
 		// >>QUIT
 		// <<221
 		void close();
@@ -83,6 +105,12 @@ namespace mail::smtp {
 			NoopHandler, void(boost::beast::error_code)
 		) async_noop(NoopHandler&& handler);
 
+		// >>AUTH LOGIN
+		// <<334
+		// >>(Base64)username
+		// <<334
+		// >>(Base64)password
+		// <<235
 		void auth_login(boost::beast::string_view username,
 						boost::beast::string_view password);
 		void auth_login(boost::beast::string_view username,
@@ -95,6 +123,14 @@ namespace mail::smtp {
 						   boost::beast::string_view password,
 						   AuthHandler&& handler);
 
+		// >>MAIL FROM:<xxx@xx.com>
+		// <<250
+		// >>RCPT TO:<xxx@xx.com>
+		// <<250
+		// >>DATA
+		// >>xxx
+		// >>.
+		// <<250
 		template <class Body, class Fields>
 		void send_mail(boost::beast::string_view from,
 					   boost::beast::string_view to,
@@ -160,14 +196,20 @@ namespace mail::smtp {
 						  const mime::entity<Body, Fields>& entity,
 						  SendHandler&& handler);
 	private:
-		void read_resp(boost::beast::error_code& ec);
+		void read_resp(boost::beast::error_code& ec)
+		{
+			read_response(s_, rd_buf_, resp_parser_, ec);
+		}
 		template <class Handler>
 		BOOST_ASIO_INITFN_RESULT_TYPE(
 			Handler, void(boost::beast::error_code)
-		) async_read_resp(Handler&& handler);
+		) async_read_resp(Handler&& handler)
+		{
+			return async_read_response(s_, rd_buf_, resp_parser_, std::forward<Handler>(handler));
+		}
 
-		template <class> class read_resp_op;
 		template <class> class open_op;
+		template <class> class open_starttls_op;
 		template <class> class close_op;
 		template <class> class noop_op;
 		template <class> class auth_login_op;
@@ -188,7 +230,6 @@ namespace mail::smtp {
 	};
 }
 
-#include "impl/read_resp.inl"
 #include "impl/open.inl"
 #include "impl/close.inl"
 #include "impl/noop.inl"
